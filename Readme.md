@@ -67,7 +67,7 @@ kmeans-image-segmentation/
    python python/kmeans_python.py --help
    ```
 
-## 🔧 Features
+## Features
 
 ### Web Application
 - **Interactive Interface**: Modern, responsive design
@@ -138,7 +138,7 @@ palette = kmeans.get_color_palette(centroids)
 print("Color Palette:", palette)
 ```
 
-## 🎯 Performance Tips
+## Performance Tips
 
 ### For Best Results:
 - **K Selection**: Start with K=3-5, adjust based on image complexity
@@ -151,7 +151,7 @@ print("Color Palette:", palette)
 - **Python**: Use `--max-iter` to limit processing time for large images
 - **Memory**: Python version can handle very large images (limited by RAM)
 
-## 🔬 Algorithm Comparison
+## Algorithm Comparison
 
 | Feature | Web Version | Python Version |
 |---------|-------------|----------------|
@@ -162,7 +162,7 @@ print("Color Palette:", palette)
 | **Dependencies** | None (browser only) | NumPy, Pillow |
 | **Batch Processing** | Manual | Scriptable |
 
-## 🛠️ Development
+## Development
 
 ### Architecture
 
