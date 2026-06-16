@@ -18,12 +18,7 @@ kmeans-image-segmentation/
 │   └── app.js                # Main application controller
 ├── python/
 │   └── kmeans_python.py      # Python command-line version
-├── README.md                 # This file
-└── examples/
-    └── sample_images/        # Sample images for testing
-        ├── landscape.jpg
-        ├── portrait.jpg
-        └── abstract.png
+└── README.md                 # This file
 ```
 
 ## Quick Start
