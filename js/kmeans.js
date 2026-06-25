@@ -33,15 +33,25 @@ class KMeans {
         const endTime = performance.now();
         const processingTime = Math.round(endTime - startTime);
         
+        // Analyze color diversity to detect low-variance images (e.g., B&W flowcharts)
+        const colorDiversity = this.analyzeColorDiversity(pixels);
+        const isLowDiversity = colorDiversity.uniqueColorEstimate < k * 2;
+
+        // Create false-color image for better visualization of clusters
+        const falseColorImageData = this.createFalseColorImage(imageData, pixels, finalCentroids, k);
+
         // Return processing statistics
         return {
             imageData: segmentedImageData,
+            falseColorImageData: falseColorImageData,
             stats: {
                 iterations,
                 converged,
                 processingTime,
                 clusters: k,
-                pixelCount: pixels.length
+                pixelCount: pixels.length,
+                colorDiversity: colorDiversity,
+                isLowDiversity: isLowDiversity
             }
         };
     }
@@ -283,6 +293,138 @@ class KMeans {
         }
         
         return segmentedImageData;
+    }
+
+    /**
+     * Analyze color diversity of the image to detect low-variance inputs
+     * (e.g., black & white flowcharts, line drawings)
+     * @param {Array} pixels - Array of pixel objects
+     * @returns {Object} Color diversity metrics
+     */
+    analyzeColorDiversity(pixels) {
+        // Sample pixels for performance (max 5000)
+        const sampleSize = Math.min(pixels.length, 5000);
+        const step = Math.max(1, Math.floor(pixels.length / sampleSize));
+
+        const colorSet = new Set();
+        let totalVariance = 0;
+        let sumR = 0, sumG = 0, sumB = 0;
+        let sampleCount = 0;
+
+        for (let i = 0; i < pixels.length; i += step) {
+            const p = pixels[i];
+            // Quantize to reduce noise — group similar colors
+            const qr = Math.round(p.r / 16) * 16;
+            const qg = Math.round(p.g / 16) * 16;
+            const qb = Math.round(p.b / 16) * 16;
+            colorSet.add(`${qr},${qg},${qb}`);
+            sumR += p.r;
+            sumG += p.g;
+            sumB += p.b;
+            sampleCount++;
+        }
+
+        const meanR = sumR / sampleCount;
+        const meanG = sumG / sampleCount;
+        const meanB = sumB / sampleCount;
+
+        // Calculate variance
+        for (let i = 0; i < pixels.length; i += step) {
+            const p = pixels[i];
+            totalVariance += (p.r - meanR) ** 2 + (p.g - meanG) ** 2 + (p.b - meanB) ** 2;
+        }
+        const avgVariance = totalVariance / sampleCount;
+
+        // Check if image is near-grayscale
+        let grayscaleCount = 0;
+        for (let i = 0; i < pixels.length; i += step) {
+            const p = pixels[i];
+            const maxDiff = Math.max(Math.abs(p.r - p.g), Math.abs(p.g - p.b), Math.abs(p.r - p.b));
+            if (maxDiff < 20) grayscaleCount++;
+        }
+        const isGrayscale = (grayscaleCount / sampleCount) > 0.9;
+
+        return {
+            uniqueColorEstimate: colorSet.size,
+            avgVariance: Math.round(avgVariance),
+            isGrayscale: isGrayscale
+        };
+    }
+
+    /**
+     * Generate a distinct color palette for false-color visualization
+     * Uses evenly spaced hues for maximum visual separation
+     * @param {number} k - Number of clusters
+     * @returns {Array} Array of {r, g, b} color objects
+     */
+    generateDistinctPalette(k) {
+        const palette = [];
+        for (let i = 0; i < k; i++) {
+            const hue = (i * 360 / k + 15) % 360; // offset to avoid pure red at 0
+            const saturation = 75 + (i % 3) * 8;  // vary saturation slightly
+            const lightness = 50 + (i % 2) * 12;  // vary lightness slightly
+            const rgb = this.hslToRgb(hue, saturation, lightness);
+            palette.push(rgb);
+        }
+        return palette;
+    }
+
+    /**
+     * Convert HSL to RGB
+     * @param {number} h - Hue (0-360)
+     * @param {number} s - Saturation (0-100)
+     * @param {number} l - Lightness (0-100)
+     * @returns {Object} {r, g, b} values (0-255)
+     */
+    hslToRgb(h, s, l) {
+        s /= 100;
+        l /= 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+
+        if (h < 60)      { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else              { r = c; g = 0; b = x; }
+
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
+    }
+
+    /**
+     * Create false-color segmented image where each cluster is a distinct vibrant color
+     * This makes segmentation visible even on monochrome/B&W images
+     * @param {ImageData} originalImageData - Original image data
+     * @param {Array} pixels - Pixels with cluster assignments
+     * @param {Array} centroids - Final centroids
+     * @param {number} k - Number of clusters
+     * @returns {ImageData} False-color image data
+     */
+    createFalseColorImage(originalImageData, pixels, centroids, k) {
+        const width = originalImageData.width;
+        const height = originalImageData.height;
+        const falseColorData = new ImageData(width, height);
+        const data = falseColorData.data;
+        const palette = this.generateDistinctPalette(k);
+
+        for (let i = 0; i < pixels.length; i++) {
+            const pixel = pixels[i];
+            const color = palette[pixel.cluster];
+            const dataIndex = i * 4;
+            data[dataIndex] = color.r;
+            data[dataIndex + 1] = color.g;
+            data[dataIndex + 2] = color.b;
+            data[dataIndex + 3] = pixel.a;
+        }
+
+        return falseColorData;
     }
 
     /**

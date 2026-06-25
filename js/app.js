@@ -184,10 +184,12 @@ class KMeansImageSegmentation {
      * Display original image in container
      */
     displayOriginalImage(img) {
-        this.elements.originalContainer.innerHTML = `
-            <h3>Original Image</h3>
-            <img src="${img.src}" alt="Original Image" style="max-width: 100%; max-height: 400px;">
-        `;
+        this.elements.originalContainer.innerHTML = '<h3>Original Image</h3>';
+        const displayImg = img.cloneNode();
+        displayImg.style.maxWidth = '100%';
+        displayImg.style.maxHeight = '400px';
+        displayImg.alt = 'Original Image';
+        this.elements.originalContainer.appendChild(displayImg);
     }
 
     /**
@@ -322,23 +324,28 @@ class KMeansImageSegmentation {
     async displayResults(result, k) {
         const { imageData, stats } = result;
 
-        // Create segmented image canvas
+        // Create segmented image canvas and render directly
+        // (Avoids toDataURL() which can fail with file:// protocol or large images)
         const segmentedCanvas = document.createElement('canvas');
         const segmentedCtx = segmentedCanvas.getContext('2d');
         segmentedCanvas.width = imageData.width;
         segmentedCanvas.height = imageData.height;
-
         segmentedCtx.putImageData(imageData, 0, 0);
-        const segmentedImageUrl = segmentedCanvas.toDataURL();
 
-        // Display segmented image
-        this.elements.segmentedContainer.innerHTML = `
-            <h3>K-Means Segmented Image (K=${k})</h3>
-            <img src="${segmentedImageUrl}" alt="Segmented Image" style="max-width: 100%; max-height: 400px;">
-            <div style="margin-top: 10px; font-size: 0.9em; color: var(--text-light);">
-                ${stats.iterations} iterations • ${stats.converged ? 'Converged' : 'Max iterations reached'}
-            </div>
-        `;
+        // Display segmented image using canvas directly
+        this.elements.segmentedContainer.innerHTML = `<h3>K-Means Segmented Image (K=${k})</h3>`;
+
+        // Style the canvas like an image
+        segmentedCanvas.style.maxWidth = '100%';
+        segmentedCanvas.style.maxHeight = '400px';
+        segmentedCanvas.style.borderRadius = '10px';
+        segmentedCanvas.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.1)';
+        this.elements.segmentedContainer.appendChild(segmentedCanvas);
+
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = 'margin-top: 10px; font-size: 0.9em; color: var(--text-light);';
+        infoDiv.textContent = `${stats.iterations} iterations \u2022 ${stats.converged ? 'Converged' : 'Max iterations reached'}`;
+        this.elements.segmentedContainer.appendChild(infoDiv);
 
         // Show processing statistics
         this.showProcessingStats(stats);
@@ -408,15 +415,15 @@ class KMeansImageSegmentation {
      * Download segmented image
      */
     downloadSegmentedImage() {
-        const img = this.elements.segmentedContainer.querySelector('img');
-        if (!img) {
+        const canvas = this.elements.segmentedContainer.querySelector('canvas');
+        if (!canvas) {
             this.showStatus('No segmented image to download.', 'error');
             return;
         }
 
         const link = document.createElement('a');
         link.download = `segmented_k${this.elements.kSlider.value}_${Date.now()}.png`;
-        link.href = img.src;
+        link.href = canvas.toDataURL();
         link.click();
     }
 }
